@@ -1,23 +1,26 @@
-<h1>Hello, New User!!!</h1>
+<h1>New User</h1>
+<hr>
+
 <form action="/users" method="post">
-  <div>
-    <label>
-        Имя
-      <input type="text" name="user[name]" value="<?= htmlspecialchars($user['name']) ?>">
-    </label>
-    <?php if (isset($errors['name'])): ?>
-      <div><?= $errors['name'] ?></div>
-    <?php endif ?>
-  </div>
-  <div>
-    <label>
-        Email
-      <input type="email" required name="user[email]" value="<?= htmlspecialchars($user['email']) ?>">
-    </label>
-    <?php if (isset($errors['email'])): ?>
-      <div><?= $errors['email'] ?></div>
-    <?php endif ?>
-  </div>
-  <div>
-    <input type="submit" value="Sign Up">
+    <div>
+        <label>
+            Nickname:
+            <input type="text" name="user[name]" value="<?= htmlspecialchars($user['name']) ?>">
+        </label>
+        <?php if (isset($errors['name'])): ?>
+            <div><?= $errors['name'] ?></div>
+        <?php endif ?>
     </div>
+    <br>
+    <div>
+    <label>
+        Email:
+      <input type="email" name="user[email]" value="<?= htmlspecialchars($user['email']) ?>">
+      <?php if (isset($errors['email'])): ?>
+            <div><?= $errors['email'] ?></div>
+        <?php endif ?>
+    </label>
+    </div>
+    <br>
+    <input type="submit" value="Submit">
+</form>

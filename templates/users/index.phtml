@@ -1,26 +1,28 @@
+<h1>Users</h1>
+<p style="color: green"><?php if (!empty($flash['success'])) {
+    foreach ($flash['success'] as $message){
+        echo $message;
+    }
+} ?></p>
+
+<?php if ($currentUser): ?>
+    <form action="/session" method="post">
+        <input type="hidden" name="_METHOD" value="DELETE">
+        <input type="submit" value="Sign Out">
+    </form>
+<?php endif; ?>
+
+<hr>
+
 <form action="/users">
-  <input type="search" name="term" value="<?= htmlspecialchars($term) ?>">
-  <input type="submit" value="Search">
+    <input type="search" name ="user" value="<?= htmlspecialchars($userName) ?>">
+    <input type="submit" value="Search">
 </form>
 
-<?php foreach ($users as $user): ?>
-    <table>
-        <div>
-        <tr> <?= htmlspecialchars($user['name'])?> </tr> 
-        <tr> <?= htmlspecialchars($user['email'])?> </tr>
-</div>
-</table>
-  <?php endforeach ?>
- 
-  
+<hr>
 
-  <?php if (count($flash) > 0) : ?>
-                    <?php foreach ($flash as $messages) : ?>
-                        <?php foreach ($messages as $message) : ?>
-                                <a><?= $message ?></a>
-                            </div>
-                        <?php endforeach ?>
-                    <?php endforeach ?>
-                <?php endif ?>
-
-
+<ul>
+    <?php foreach ($users as $user): ?>
+    <li><a href="/users/<?= htmlspecialchars($user['id']) ?>"> <?= htmlspecialchars($user['nickname']) ?> </a></li>
+    <?php endforeach ?>
+</ul>

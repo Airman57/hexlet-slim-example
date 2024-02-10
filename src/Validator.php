@@ -6,14 +6,14 @@ class Validator
 {
     public function validate(array $user)
     {
-
         $errors = [];
-        if ($user['name'] == ''){
-          $errors['name'] = "Заполните поле";
+        if (isset($user['name']) && strlen($user['name']) <= 4) {
+            $errors['name'] = 'Nickname must be grater than 4 characters';
         }
-        if ($user['email'] == '') {
-          $errors['email'] = "Заполните поле";
+        if (empty($user['email'])) {
+            $errors['email'] = "Can't be blank";
         }
+
         return $errors;
     }
 }

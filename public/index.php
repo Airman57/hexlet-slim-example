@@ -1,4 +1,6 @@
-<?php 
+<?php
+
+// Подключение автозагрузки через composer
 require __DIR__ . '/../vendor/autoload.php';
 
 use Slim\Factory\AppFactory;
@@ -7,8 +9,6 @@ use DI\Container;
 use App\Validator;
 
 session_start();
-
-//$users = ['mike', 'mishel', 'adel', 'keks', 'kamila'];
 
 $container = new Container();
 $container->set('renderer', function () {
@@ -20,90 +20,198 @@ $container->set('flash', function () {
 });
 
 $app = AppFactory::createFromContainer($container);
-$app->add(MethodOverrideMiddleware::class);
 $app->addErrorMiddleware(true, true, true);
+$app->add(MethodOverrideMiddleware::class);
 
-$router = $app->getRouteCollector()->getRouteParser();
-
-$app->get('/', function ($request, $response) use ($router) {
+$app->get('/', function ($request, $response) {
     $response->getBody()->write('Welcome to Slim!');
     return $response;
     // Благодаря пакету slim/http этот же код можно записать короче
     // return $response->write('Welcome to Slim!');
-})->setName('/');
+})->setName('index');
 
 $app->get('/users', function ($request, $response) {
-    $term = $request->getQueryParam('term');
-    $inp = file_get_contents(__DIR__ . '/../templates/users/usersrepo.json');
-    $users = json_decode($inp,true);
-    foreach ($users as $user) {
-        if (str_contains($user['name'], $term)) {
-            $filteredUsers[] = ['name' => $user['name'], 'email' => $user['email']];
-        }
-    }
-    $messages = $this->get('flash')->getMessages();
-    $params = ['users' => $filteredUsers, 'flash' => $messages];
-    return $this->get('renderer')->render($response, 'users/index.phtml', $params);
-})->setName('users');
+    $usersData = json_decode($request->getCookieParam('users', json_encode([])), true);
 
-$app->post('/users', function ($request, $response) use ($router) { 
-    $user = $request->getParsedBodyParam('user');
-    $user['id'] = uniqid();
-    $validator = new Validator();
-    $errors = $validator->validate($user);
-    if (count($errors) === 0) {
-        $this->get('flash')->addMessage('success', 'Пользователь был добавлен');
-        $url = $router->urlFor('users');
-    $inp = file_get_contents(__DIR__ . '/../templates/users/usersrepo.json');
-    $tempArray = json_decode($inp,true);
-    array_push($tempArray, $user);
-    $jsonData = json_encode($tempArray);
-    file_put_contents(__DIR__ . '/../templates/users/usersrepo.json', $jsonData);
-    return $response->withRedirect($url);
-    }
-    $params = ['user' => $user, 'errors' => $errors];
-    return $this->get('renderer')->render($response, "users/new.phtml", $params);
-});
+    $userName = $request->getQueryParam('user');
+
+    $filterUsers = array_filter($usersData, function ($user) use ($userName) {
+        return str_contains($user['nickname'], $userName);
+    });
+
+    $messages = $this->get('flash')->getMessages();
+
+    $params = [
+        'users' => $filterUsers,
+        'userName' => $userName,
+        'flash' => $messages,
+        'currentUser' => $_SESSION['user'] ?? null
+    ];
+    return $this->get('renderer')->render($response, "users/index.phtml", $params);
+})->setName('users.index');
 
 $app->get('/users/new', function ($request, $response) {
-    $params = [];
-    return $this->get('renderer')->render($response, 'users/new.phtml', $params);
-})->setName('/users/new');
+    $params = [
+        'user' => ['name' => '', 'email' => ''],
+    ];
+    return $this->get('renderer')->render($response, "users/new.phtml", $params);
+})->setName('users.new');
+
+$app->post('/users', function ($request, $response) {
+    $validator = new Validator();
+    $user = $request->getParsedBodyParam('user');
+    $errors = $validator->validate($user);
+
+    if (count($errors) > 0) {
+        $params = [
+            'user' => $user,
+            'errors' => $errors
+        ];
+        return $this->get('renderer')->render($response->withStatus(422), 'users/new.phtml', $params);
+    }
+
+    $id = uniqid();
+
+    $newUser = [
+        'id' => $id,
+        'nickname' => $user['name'],
+        'email' => $user["email"],
+    ];
+
+    $existingUsers = json_decode($request->getCookieParam('users', json_encode([])), true);
+
+    $existingUsers[] = $newUser;
+
+    $encodedUsers = json_encode($existingUsers);
+
+    $this->get('flash')->addMessage('success', 'User was added successfully');
+
+    return $response->withHeader('Set-Cookie', "users={$encodedUsers}")->withRedirect('/users', 302);
+})->setName('users.store');
 
 $app->get('/courses/{id}', function ($request, $response, array $args) {
     $id = $args['id'];
     return $response->write("Course id: {$id}");
-});
+})->setName('courses.show');
 
 $app->get('/users/{id}', function ($request, $response, $args) {
-    $params = ['id' => $args['id'], 'nickname' => 'user-' . $args['id']];
-    // Указанный путь считается относительно базовой директории для шаблонов, заданной на этапе конфигурации
-    // $this доступен внутри анонимной функции благодаря https://php.net/manual/ru/closure.bindto.php
-    // $this в Slim это контейнер зависимостей
-    $users = json_decode(file_get_contents(__DIR__ . '/../templates/users/usersrepo.json'), true);
-    $usersId = [];
-    foreach ($users as $user) {
-        $usersId[] = $user['id'];
-    }
-    if (!in_array($args['id'], $usersId)) {
-        return $response->withStatus(404);
-    }
-    return $this->get('renderer')->render($response, 'users/show.phtml', $params);
-})->setName('user');
+    $userId = $args['id'];
 
-$app->delete('/users/{id}', function ($request, $response, array $args) use ($router) {
-    $inp = file_get_contents(__DIR__ . '/../templates/users/usersrepo.json');
-    $users = json_decode($inp,true);
-    $id = $args['id'];
-    foreach ($users as $key=>$user) {
-        if($user['id'] == $id) {
-            unset($users[$key]);
+    $existingUsers = json_decode($request->getCookieParam('users', json_encode([])), true);
+
+    $userExists = false;
+    foreach ($existingUsers as $user) {
+        if ($user['id'] === $userId) {
+            $userExists = true;
+            break;
         }
     }
-    $newUsers = array_values($users);
-    $jsonData = json_encode($users);
-    file_put_contents(__DIR__ . '/../templates/users/usersrepo.json', $jsonData);
-    $this->get('flash')->addMessage('success', 'User has been deleted');
+
+    if (!$userExists) {
+        return $response->withStatus(404)
+                        ->withHeader('Content-Type', 'text/html')
+                        ->write('Page not found');
+    }
+
+    $params = ['id' => $userId, 'nickname' => 'user-' . $userId, 'email' => $user['email']];
+    return $this->get('renderer')->render($response, 'users/show.phtml', $params);
+})->setName('users.show');
+
+$app->get('/users/{id}/edit', function ($request, $response, $args) {
+    $userId = $args['id'];
+    $users = json_decode($request->getCookieParam('users', json_encode([])), true);
+
+    $user = null;
+    foreach ($users as $existingUser) {
+        if ($existingUser['id'] == $userId) {
+            $user = $existingUser;
+            break;
+        }
+    }
+
+    $params = ['user' => $user, 'errors' => []];
+    return $this->get('renderer')->render($response, 'users/edit.phtml', $params);
+})->setName('users.edit');
+
+$app->patch('/users/{id}', function ($request, $response, array $args) {
+    $userId = $args['id'];
+    $users = json_decode($request->getCookieParam('users', json_encode([])), true);
+    $user = null;
+    foreach ($users as $existingUser) {
+        if ($existingUser['id'] == $userId) {
+            $user = $existingUser;
+            break;
+        }
+    }
+    $data = $request->getParsedBodyParam('user');
+
+    $validator = new Validator();
+    $errors = $validator->validate($data);
+
+    if (count($errors) === 0) {
+        $user['email'] = $data['email'];
+
+        foreach ($users as &$existingUser) {
+            if ($existingUser['id'] == $userId) {
+                $existingUser = $user;
+            }
+        }
+
+        $encodedUsers = json_encode($users);
+
+        return $response->withHeader('Set-Cookie', "users={$encodedUsers}")->withRedirect('/users/' . $userId, 302);
+    }
+
+    $params = [
+        'user' => $user,
+        'errors' => $errors
+    ];
+
+    $response = $response->withStatus(422);
+    return $this->get('renderer')->render($response, 'users/edit.phtml', $params);
+});
+
+$app->delete('/users/{id}', function ($request, $response, array $args) {
+    $id = $args['id'];
+    $users = json_decode($request->getCookieParam('users', json_encode([])), true);
+    $index = array_search($id, array_column($users, 'id'));
+
+    array_splice($users, $index, 1);
+
+    $encodedUsers = json_encode($users);
+
+    $this->get('flash')->addMessage('success', 'School has been deleted');
+
+    return $response->withHeader('Set-Cookie', "users={$encodedUsers}")->withRedirect('/users', 302);
+});
+
+$app->get('/login', function ($request, $response) {
+    $params = ['currentUser' => $_SESSION['user'] ?? null];
+    return $this->get('renderer')->render($response, 'users/login.phtml', $params);
+});
+
+$app->post('/session', function ($request, $response) {
+    $userData = $request->getParsedBodyParam('user');
+    $users = json_decode($request->getCookieParam('users', json_encode([])), true);
+    $user = null;
+    foreach ($users as $userItem) {
+        if ($userItem['name'] === $userData['name']) {
+            $user = $userItem;
+            break;
+        }
+    }
+
+    if ($user) {
+        $_SESSION['user'] = $user;
+    } else {
+        $this->get('flash')->addMessage('error', 'Wrong email');
+    }
+    return $response->withRedirect('/users');
+});
+
+$app->delete('/session', function ($request, $response) {
+    $_SESSION = [];
+    session_destroy();
     return $response->withRedirect('/users');
 });
 

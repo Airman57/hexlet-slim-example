@@ -1,6 +1,8 @@
-<h1>Hello, <?= htmlspecialchars($id) ?></h1>
-
-<form action="/users/<?= $user['id'] ?>" method="post">
+<p>id = <?= htmlspecialchars($id) ?></p>
+<p>nickname = <?= htmlspecialchars($nickname) ?></p>
+<p>email = <?= htmlspecialchars($email) ?></p>
+<a href="/users/<?= htmlspecialchars($id) ?>/edit"> редактировать </a>
+<form action="/users/<?= $id ?>" method="post">
   <input type="hidden" name="_METHOD" value="DELETE">
   <input type="submit" value="Remove">
 </form>
